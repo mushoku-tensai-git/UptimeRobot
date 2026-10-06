@@ -809,7 +809,7 @@ setInterval(() => {
                         <span class="text-xs font-mono text-accent-green font-normal">[Developer Docs]</span>
                     </h3>
                     <p class="text-xs text-mute font-sans mt-1">
-                        तुमच्या वेबसाइट्स, API किंवा बॅकएंड सर्व्हरला UptimeRobot सारखे मॉनिटर कसे करावे आणि तुमच्या स्वतःच्या ॲपमध्ये स्टेटस बॅजेस कसे लावावे याचे संपूर्ण मार्गदर्शन.
+                        A step-by-step developer guide to monitoring websites, APIs, and background workers with UptimeRobot-grade telemetry and embeddable status badges.
                     </p>
                 </div>
 
@@ -827,30 +827,30 @@ setInterval(() => {
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-3">
                         <div class="flex items-center space-x-2 text-xs font-mono text-ink">
                             <span class="px-2 py-0.5 rounded bg-surface-elevated border border-hairline text-accent-green">STEP 1</span>
-                            <span class="font-medium">नवीन मॉनिटर जोडा (Click '+ New Monitor')</span>
+                            <span class="font-medium">Create a Monitor (Click '+ New Monitor')</span>
                         </div>
                         <p class="text-xs text-mute leading-relaxed">
-                            वर उजव्या कोपऱ्यात असलेल्या पांढऱ्या <strong>'+ New Monitor'</strong> बटणावर क्लिक करा. तुमच्या सेवेचे नाव टाका (उदा. <code>My Production App</code> किंवा <code>Auth API</code>).
+                            Click the bright white <strong>'+ New Monitor'</strong> button in the top right. Give your service a friendly identifier (e.g., <code>Production API</code> or <code>Auth Gateway</code>).
                         </p>
                     </div>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-3">
                         <div class="flex items-center space-x-2 text-xs font-mono text-ink">
                             <span class="px-2 py-0.5 rounded bg-surface-elevated border border-hairline text-accent-green">STEP 2</span>
-                            <span class="font-medium">URL प्रविष्ट करा आणि लाईव्ह टेस्ट करा (Test Live Probe)</span>
+                            <span class="font-medium">Enter Endpoint &amp; Test Live Probe</span>
                         </div>
                         <p class="text-xs text-mute leading-relaxed">
-                            तुमची थेट ॲप URL (उदा. <code>https://my-app.vercel.app</code>) टाका आणि <strong>'Test Live Probe'</strong> वर क्लिक करा. सिस्टीम तात्काळ रिअल राउंड-ट्रिप लेटन्सी (ms) आणि HTTP रिस्पॉन्स तपासेल.
+                            Provide your target URL (e.g., <code>https://my-app.vercel.app</code>) and click <strong>'Test Live Probe'</strong>. The probing engine will immediately verify network reachability, HTTP response code, and round-trip latency in milliseconds.
                         </p>
                     </div>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-3">
                         <div class="flex items-center space-x-2 text-xs font-mono text-ink">
                             <span class="px-2 py-0.5 rounded bg-surface-elevated border border-hairline text-accent-green">STEP 3</span>
-                            <span class="font-medium">स्वयंचलित २४/७ मॉनिटरिंग सुरू होते (Auto Monitoring)</span>
+                            <span class="font-medium">Automated Continuous Monitoring</span>
                         </div>
                         <p class="text-xs text-mute leading-relaxed">
-                            <strong>'Save &amp; Start Probe'</strong> दाबल्यावर ॲप दर २० सेकंदांनी स्वयंचलित चाचणी घेईल, ३० दिवसांचा टाइमलाइन बार तयार करेल आणि सर्व्हर बंद पडल्यास ऑडिओ सायरन व बॅनर अलर्ट देईल.
+                            Click <strong>'Save &amp; Start Probe'</strong>. The engine will automatically sweep the endpoint every 20 seconds, compile a rolling 30-day timeline bar, and trigger audio-visual incident alerts if an outage is detected.
                         </p>
                     </div>
                 </div>
@@ -858,21 +858,21 @@ setInterval(() => {
                 <!-- Tab 2: Add to Your App -->
                 <div id="guideSectionEmbed" class="hidden space-y-4">
                     <p class="text-xs text-mute">
-                        मॉनिटर कार्डवरील <strong>&lt; &gt; (Code)</strong> आयकॉनवर क्लिक करून तुमच्या स्वतःच्या वेबसाइट किंवा GitHub वर लाईव्ह स्टेटस दाखवता येते:
+                        Click the <strong>&lt; &gt; (Code)</strong> icon on any monitor card to grab ready-to-use embed snippets for your repositories and websites:
                     </p>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">A. GitHub README.md मधील Uptime Badge</span>
+                        <span class="text-xs font-mono text-ink font-medium block">A. GitHub README.md Live Status Badge</span>
                         <p class="text-xs text-ash">
-                            तुमच्या ओपन सोर्स रिपॉझिटरीच्या README फाईलमध्ये थेट खालीलप्रमाणे मार्कडाउन कोड पेस्ट करा:
+                            Embed real-time uptime status into your repository documentation using standard Markdown:
                         </p>
                         <pre class="bg-surface-deep p-2.5 rounded border border-hairline text-xs font-mono text-ink"><code>[![Uptime](https://img.shields.io/badge/Uptime-100%25-11ff99?style=flat-square)](https://uptimeradar.dev)</code></pre>
                     </div>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">B. तुमच्या स्वतःच्या ॲपमध्ये Floating Status Pill Widget</span>
+                        <span class="text-xs font-mono text-ink font-medium block">B. Floating Status Pill Widget</span>
                         <p class="text-xs text-ash">
-                            तुमच्या HTML, React, Next.js किंवा Vue ॲपच्या <code>&lt;/body&gt;</code> आधी १-लाइनचा विजेट स्क्रिप्ट टाका. तुमच्या ॲपच्या खालच्या उजव्या कोपऱ्यात सुंदर हिरवा <strong>"System Operational"</strong> फ्लोटिंग बॅज दिसेल!
+                            Paste the 1-line widget script just before the closing <code>&lt;/body&gt;</code> tag in your HTML, React, Next.js, or Vue application. A minimal green <strong>"System Operational"</strong> pill will render in the corner of your page.
                         </p>
                     </div>
                 </div>
@@ -880,17 +880,17 @@ setInterval(() => {
                 <!-- Tab 3: Heartbeat & Cron -->
                 <div id="guideSectionHeartbeat" class="hidden space-y-4">
                     <p class="text-xs text-mute">
-                        काही बॅकएंड सर्व्हिसेस, क्रॉन जॉब्स (Cron Jobs) किंवा डेटाबेस बॅकअप स्क्रिप्ट्सना पब्लिक URL नसते. त्यांच्यासाठी <strong>Heartbeat Push API</strong> वापरली जाते.
+                        For backend microservices, cron jobs, worker scripts, and database backup routines without a public inbound HTTP port, use the <strong>Push Heartbeat API</strong>.
                     </p>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">हे कसे काम करते? (Push Heartbeat)</span>
+                        <span class="text-xs font-mono text-ink font-medium block">How Push Heartbeats Work:</span>
                         <p class="text-xs text-ash">
-                            १. 'New Monitor' मध्ये जाऊन <strong>'Heartbeat'</strong> पर्याय निवडा.<br>
-                            २. तुम्हाला एक युनिक टोकन URL मिळेल (उदा. <code>https://api.uptimeradar.dev/v1/ping/hb_xyz</code>).<br>
-                            ३. तुमच्या बॅकएंड कोडमध्ये किंवा Crontab मध्ये दर मिनिटाला खालीलप्रमाणे पिंग कॉल करा:
+                            1. In 'New Monitor', select the <strong>'Heartbeat'</strong> monitor type.<br>
+                            2. A unique ping token URL is generated (e.g., <code>https://api.uptimeradar.dev/v1/ping/hb_token</code>).<br>
+                            3. Send an HTTP POST ping periodically from your backend service or crontab:
                         </p>
-                        <pre class="bg-surface-deep p-2.5 rounded border border-hairline text-xs font-mono text-ink"><code>// Node.js Express उदाहरण
+                        <pre class="bg-surface-deep p-2.5 rounded border border-hairline text-xs font-mono text-ink"><code>// Node.js Express Example
 setInterval(() => {
   fetch('https://api.uptimeradar.dev/v1/ping/hb_token', { method: 'POST' });
 }, 60000);</code></pre>
@@ -900,15 +900,15 @@ setInterval(() => {
                 <!-- Tab 4: Webhook Alerts -->
                 <div id="guideSectionWebhook" class="hidden space-y-4">
                     <p class="text-xs text-mute">
-                        सर्व्हर बंद पडल्यास किंवा HTTP ५०० त्रुटी आल्यास तात्काळ तुमच्या <strong>Discord चॅनेलवर किंवा Slack</strong> वर अलर्ट पाठवला जातो.
+                        Get instant alerts in your team channels whenever an endpoint fails consecutive probes or returns HTTP 5xx responses.
                     </p>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">वेबहूक कसा जोडायचा?</span>
+                        <span class="text-xs font-mono text-ink font-medium block">Connecting Webhooks:</span>
                         <ol class="list-decimal list-inside text-xs text-ash space-y-1.5 pl-1">
-                            <li>Discord चॅनेल Settings &rarr; Integrations &rarr; Webhooks &rarr; <strong>Copy Webhook URL</strong>.</li>
-                            <li>मॉनिटर कार्डवरील <strong>&lt; &gt;</strong> बटण दाबून <strong>'Discord / Slack Webhooks'</strong> टॅब उघडा.</li>
-                            <li>तुमची Webhook URL पेस्ट करा आणि <strong>'Send Test Alert Payload'</strong> वर क्लिक करून टेस्ट करा!</li>
+                            <li>Discord: Channel Settings &rarr; Integrations &rarr; Webhooks &rarr; <strong>Copy Webhook URL</strong>.</li>
+                            <li>Slack: Add Incoming WebHooks App &rarr; <strong>Copy Webhook URL</strong>.</li>
+                            <li>Click the <strong>&lt; &gt;</strong> icon on your monitor, select <strong>'Discord / Slack Webhooks'</strong>, paste the URL, and click <strong>'Send Test Alert Payload'</strong>.</li>
                         </ol>
                     </div>
                 </div>
@@ -916,16 +916,16 @@ setInterval(() => {
                 <!-- Tab 5: Maintenance & SLA -->
                 <div id="guideSectionAdvanced" class="hidden space-y-4">
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">१. Scheduled Maintenance Window (नियोजित मेंटेनन्स)</span>
+                        <span class="text-xs font-mono text-ink font-medium block">1. Scheduled Maintenance Windows</span>
                         <p class="text-xs text-ash">
-                            जेव्हा तुम्ही ॲप अपडेट किंवा डेटाबेस मायग्रेशन करत असता, तेव्हा मॉनिटर कार्डवरील <strong>Gear/Wrench आयकॉन</strong> दाबा. यामुळे मॉनिटर पर्पल 'MAINT' मोडमध्ये जातो आणि चुकीचा डाऊनटाईम किंवा खोटा सायरन वाजणे थांबते.
+                            Before performing database migrations or deploying upgrades, click the <strong>Gear/Wrench icon</strong> on the monitor card. This switches the monitor to purple 'MAINT' mode, muting downtime alarms and protecting your SLA numbers.
                         </p>
                     </div>
 
                     <div class="p-4 bg-surface-card rounded-md border border-hairline space-y-2">
-                        <span class="text-xs font-mono text-ink font-medium block">२. SLA Report Export (CSV &amp; JSON)</span>
+                        <span class="text-xs font-mono text-ink font-medium block">2. SLA Telemetry Reports (CSV &amp; JSON)</span>
                         <p class="text-xs text-ash">
-                            वर दिलेल्या <strong>'Export'</strong> बटणावर क्लिक करून तुमच्या संपूर्ण इन्फ्रास्ट्रक्चरचा ३०-दिवसांचा SLA उपलब्धता रिपोर्ट एक्सेल/CSV किंवा JSON फॉरमॅटमध्ये डाउनलोड करा.
+                            Click the <strong>'Export'</strong> dropdown in the toolbar to download a complete 30-day uptime audit log formatted for Excel/CSV or machine-readable JSON.
                         </p>
                     </div>
                 </div>
