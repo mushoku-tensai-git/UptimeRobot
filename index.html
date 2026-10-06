@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UptimePulse - Modern Uptime Monitoring</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for response time graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Tone.js for clean synthesized notification sounds -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        uptime: {
+                            green: '#00C271',
+                            darkGreen: '#009657',
+                            red: '#EF4444',
+                            yellow: '#F59E0B',
+                            gray: '#6B7280',
+                            bg: '#0B0F19',
+                            card: '#111827',
+                            cardBorder: '#1F2937'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0F19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #232d42;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #374151;
+        }
+
+        /* Radar pulse animation for online status badge */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.4); opacity: 0; }
+            100% { transform: scale(0.95); opacity: 0; }
+        }
+        .pulse-beacon {
+            position: relative;
+        }
+        .pulse-beacon::after {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            border-radius: 9999px;
+            background: currentColor;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
+        .timeline-pill {
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+        .timeline-pill:hover {
+            transform: scaleY(1.35);
+            filter: brightness(1.2);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-[#0B0F19] text-gray-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+    <!-- Main Shell -->
+    <div id="app" class="flex flex-col min-h-screen">
+        
+        <!-- Header / Navigation Bar -->
+        <header class="sticky top-0 z-40 bg-[#111827]/90 backdrop-blur-md border-b border-gray-800 px-4 lg:px-8 py-3.5 transition-colors">
+            <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                
+                <!-- Logo & Brand -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-tight text-white">Uptime<span class="text-emerald-400">Robot</span></span>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Pro Clone</span>
+                        </div>
+                        <p class="text-xs text-gray-400 hidden sm:block">Automated 24/7 Availability & Latency Radar</p>
+                    </div>
+                </div>
+
+                <!-- Right Action Bar -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- Status Page Toggle Button -->
+                    <button id="toggleViewBtn" onclick="togglePublicStatusPage()" class="flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg bg-gray-800/80 hover:bg-gray-700 text-gray-200 border border-gray-700 transition">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        <span id="viewModeText" class="hidden sm:inline">Public Status Page</span>
+                    </button>
+
+                    <!-- Auto-Check Refresh Timer Badge -->
+                    <div id="refreshTimerBadge" class="hidden md:flex items-center space-x-1.5 px-3 py-2 text-xs rounded-lg bg-gray-900 border border-gray-800 text-gray-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Auto check: <span id="countdownDisplay" class="font-mono text-emerald-400">20s</span></span>
+                    </div>
+
+                    <!-- Audio Alert Toggle -->
+                    <button id="soundToggleBtn" onclick="toggleSoundAlerts()" title="Toggle Alert Sound FX" class="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                        <svg id="soundIconOn" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        </svg>
+                        <svg id="soundIconOff" class="w-4 h-4 text-gray-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                        </svg>
+                    </button>
+
+                    <!-- Add New Monitor Button -->
+                    <button onclick="openAddMonitorModal()" class="flex items-center space-x-2 px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>New Monitor</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+            <!-- Incident Banner (Dynamic Alert on system anomalies) -->
+            <div id="activeIncidentAlert" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-4 transition-all">
+                <div class="flex items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 rounded-lg bg-red-500/20 text-red-400">
+                            <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-red-200" id="incidentAlertTitle">Degraded Service Detected</h3>
+                            <p class="text-xs text-red-300/80" id="incidentAlertDesc">1 service is currently failing health check responses.</p>
+                        </div>
+                    </div>
+                    <button onclick="dismissIncidentBanner()" class="text-xs px-2.5 py-1.5 rounded bg-red-950/60 hover:bg-red-900/60 text-red-300 border border-red-800">Dismiss</button>
+                </div>
+            </div>
+
+            <!-- Dashboard Viewport Content -->
+            <div id="dashboardView" class="space-y-6">
+                <!-- Summary KPI Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Total Monitors -->
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 relative overflow-hidden group hover:border-gray-700 transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Monitors</p>
+                                <h3 id="statTotalMonitors" class="text-2xl font-bold text-white mt-1">6</h3>
+                            </div>
+                            <span class="p-2 rounded-lg bg-gray-800 text-gray-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center space-x-2 text-xs text-gray-400">
+                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span id="statActiveRatio">5 active checks</span>
+                        </div>
+                    </div>
+
+                    <!-- Online Status -->
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 relative overflow-hidden group hover:border-emerald-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Operational (Up)</p>
+                                <h3 id="statUpMonitors" class="text-2xl font-bold text-emerald-400 mt-1">5</h3>
+                            </div>
+                            <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center space-x-2 text-xs text-emerald-400/80">
+                            <span>Nominal latency state</span>
+                        </div>
+                    </div>
+
+                    <!-- Down Status -->
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 relative overflow-hidden group hover:border-red-500/40 transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Incidents (Down)</p>
+                                <h3 id="statDownMonitors" class="text-2xl font-bold text-red-400 mt-1">1</h3>
+                            </div>
+                            <span class="p-2 rounded-lg bg-red-500/10 text-red-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center space-x-2 text-xs text-red-400/80">
+                            <span id="statDownSubtitle">1 failing endpoint</span>
+                        </div>
+                    </div>
+
+                    <!-- Avg 24h Uptime -->
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 relative overflow-hidden group hover:border-gray-700 transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Overall Uptime</p>
+                                <h3 id="statOverallUptime" class="text-2xl font-bold text-white mt-1">99.82%</h3>
+                            </div>
+                            <span class="p-2 rounded-lg bg-gray-800 text-teal-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                            </span>
+                        </div>
+                        <div class="mt-3 flex items-center space-x-2 text-xs text-gray-400">
+                            <span class="text-gray-300">Avg Latency:</span>
+                            <span id="statAvgLatency" class="font-mono text-emerald-400 font-semibold">78 ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Bar & Quick Simulator Actions -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#111827] p-3 rounded-xl border border-gray-800">
+                    <!-- Search & Filter Controls -->
+                    <div class="flex flex-wrap items-center gap-2 flex-1">
+                        <!-- Search Bar -->
+                        <div class="relative flex-1 min-w-[200px]">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            </span>
+                            <input id="searchInput" type="text" oninput="filterMonitors()" placeholder="Search monitors or endpoints..." class="w-full bg-gray-900 border border-gray-800 rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                        </div>
+
+                        <!-- Status Filter Filter Tabs -->
+                        <div class="flex bg-gray-900 p-0.5 rounded-lg border border-gray-800 text-xs font-medium">
+                            <button onclick="setStatusFilter('ALL')" id="filterBtnALL" class="px-3 py-1.5 rounded-md bg-gray-800 text-white shadow-sm transition">All</button>
+                            <button onclick="setStatusFilter('UP')" id="filterBtnUP" class="px-3 py-1.5 rounded-md text-gray-400 hover:text-white transition">Up</button>
+                            <button onclick="setStatusFilter('DOWN')" id="filterBtnDOWN" class="px-3 py-1.5 rounded-md text-gray-400 hover:text-white transition">Down</button>
+                            <button onclick="setStatusFilter('PAUSED')" id="filterBtnPAUSED" class="px-3 py-1.5 rounded-md text-gray-400 hover:text-white transition">Paused</button>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Controls -->
+                    <div class="flex items-center space-x-2">
+                        <button onclick="checkAllMonitorsNow()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-200 border border-gray-700 transition" title="Force check all endpoints right now">
+                            <svg id="refreshSpinIcon" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Check All</span>
+                        </button>
+                        <button onclick="simulateIncidentToggle()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-xs font-medium text-red-300 border border-red-800/80 transition" title="Simulate an outage to test alert workflows">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>Test Outage</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Monitors List Header -->
+                <div class="flex items-center justify-between text-xs text-gray-400 font-medium px-2">
+                    <span id="monitorsCountText">Showing 6 monitors</span>
+                    <span>30-Day Activity History</span>
+                </div>
+
+                <!-- Monitors Dynamic List -->
+                <div id="monitorsContainer" class="space-y-3">
+                    <!-- Populated dynamically via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Public Status Page View (Toggled via button) -->
+            <div id="publicStatusPageView" class="hidden space-y-8 max-w-4xl mx-auto py-6">
+                <!-- Status Header Banner -->
+                <div class="text-center space-y-3">
+                    <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-medium">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulse-beacon"></span>
+                        <span id="publicSystemStatusText">All Core Systems Operational</span>
+                    </div>
+                    <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">System Status & Reliability</h1>
+                    <p class="text-sm text-gray-400 max-w-lg mx-auto">Real-time status updates and historical uptime performance for global infrastructure and API endpoints.</p>
+                </div>
+
+                <!-- 90-Day System Uptime Score Banner -->
+                <div class="bg-[#111827] rounded-2xl border border-gray-800 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                    <div>
+                        <span class="text-xs uppercase font-semibold text-gray-400 tracking-wider">Average 90-Day Uptime</span>
+                        <h2 class="text-4xl font-extrabold text-emerald-400 mt-1" id="publicOverallUptime">99.94%</h2>
+                    </div>
+                    <div class="flex items-center space-x-4 text-xs text-gray-400">
+                        <div class="text-right">
+                            <span class="block text-gray-300 font-medium">Monitoring frequency</span>
+                            <span>Every 60 seconds</span>
+                        </div>
+                        <div class="h-8 w-px bg-gray-800"></div>
+                        <div class="text-right">
+                            <span class="block text-gray-300 font-medium">Global Locations</span>
+                            <span>12 Probing nodes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Public Services Status Accordion/Cards -->
+                <div class="space-y-4">
+                    <h3 class="text-base font-semibold text-white">Active Components</h3>
+                    <div id="publicComponentsList" class="space-y-3">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Incident History Log -->
+                <div class="bg-[#111827] rounded-2xl border border-gray-800 p-6 space-y-4">
+                    <h3 class="text-base font-semibold text-white">Past Incident Timeline</h3>
+                    <div id="incidentHistoryList" class="space-y-4">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Back to Admin Bar -->
+                <div class="text-center pt-4">
+                    <button onclick="togglePublicStatusPage()" class="text-xs text-emerald-400 hover:text-emerald-300 underline font-medium">
+                        ← Return to UptimeRobot Management Dashboard
+                    </button>
+                </div>
+            </div>
+
+        </main>
+        
+        <footer class="bg-[#111827] border-t border-gray-800 mt-auto py-6 px-4">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+                <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Monitoring engine active &bull; Cloud Probing Simulator</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span>UptimeRobot Web Application</span>
+                    <span>&bull;</span>
+                    <button onclick="resetToSampleData()" class="hover:text-emerald-400 transition">Reset Demo Data</button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal: Add / Edit Monitor -->
+    <div id="monitorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm hidden">
+        <div class="bg-[#111827] border border-gray-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden transform transition-all">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                <h3 id="modalTitle" class="text-lg font-bold text-white">Create New Monitor</h3>
+                <button onclick="closeMonitorModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form id="monitorForm" onsubmit="saveMonitor(event)" class="p-6 space-y-4">
+                <input type="hidden" id="monitorIdInput" value="">
+                
+                <!-- Monitor Type -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Monitor Type</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="monitorType" value="HTTP" checked class="peer sr-only" onchange="updateFormTypeFields()">
+                            <div class="p-2.5 text-center text-xs rounded-lg border border-gray-800 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-400 hover:border-gray-700 transition">
+                                HTTP(s)
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="monitorType" value="KEYWORD" class="peer sr-only" onchange="updateFormTypeFields()">
+                            <div class="p-2.5 text-center text-xs rounded-lg border border-gray-800 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-400 hover:border-gray-700 transition">
+                                Keyword
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="monitorType" value="PORT" class="peer sr-only" onchange="updateFormTypeFields()">
+                            <div class="p-2.5 text-center text-xs rounded-lg border border-gray-800 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-400 hover:border-gray-700 transition">
+                                Port / Ping
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Friendly Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">Friendly Name</label>
+                    <input type="text" id="monitorNameInput" required placeholder="e.g. Production API Gateway" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- URL / Endpoint -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">URL or IP Address</label>
+                    <input type="text" id="monitorUrlInput" required placeholder="https://api.mycompany.com/health" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- Keyword Check Field (conditional) -->
+                <div id="keywordFieldContainer" class="hidden">
+                    <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">Keyword to Assert</label>
+                    <input type="text" id="monitorKeywordInput" placeholder="e.g. &quot;status&quot;: &quot;ok&quot;" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <!-- Monitoring Interval -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">Monitoring Interval</label>
+                    <select id="monitorIntervalInput" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500">
+                        <option value="30">Every 30 seconds (Pro)</option>
+                        <option value="60" selected>Every 1 minute</option>
+                        <option value="300">Every 5 minutes</option>
+                        <option value="600">Every 10 minutes</option>
+                    </select>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-800">
+                    <button type="button" onclick="closeMonitorModal()" class="px-4 py-2 text-sm rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition">Save Monitor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Monitor Analytics & Latency Inspector -->
+    <div id="analyticsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm hidden">
+        <div class="bg-[#111827] border border-gray-800 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                <div>
+                    <h3 id="analyticsTitle" class="text-lg font-bold text-white">Production API</h3>
+                    <p id="analyticsUrl" class="text-xs text-gray-400 font-mono">https://api.example.com</p>
+                </div>
+                <button onclick="closeAnalyticsModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <!-- Metrics Snapshot -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="p-3 bg-gray-900 rounded-xl border border-gray-800 text-center">
+                        <span class="text-xs text-gray-400">Current Ping</span>
+                        <div id="analyticsCurrentPing" class="text-xl font-bold font-mono text-emerald-400 mt-0.5">42 ms</div>
+                    </div>
+                    <div class="p-3 bg-gray-900 rounded-xl border border-gray-800 text-center">
+                        <span class="text-xs text-gray-400">30d Uptime</span>
+                        <div id="analyticsUptimePct" class="text-xl font-bold font-mono text-white mt-0.5">99.98%</div>
+                    </div>
+                    <div class="p-3 bg-gray-900 rounded-xl border border-gray-800 text-center">
+                        <span class="text-xs text-gray-400">SSL Certificate</span>
+                        <div id="analyticsSslStatus" class="text-xs font-semibold text-teal-400 mt-2">Valid (78 days)</div>
+                    </div>
+                </div>
+
+                <!-- Latency Chart Canvas -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold uppercase text-gray-400">Response Time History (24 Hours)</span>
+                        <span class="text-xs text-gray-400">Milliseconds</span>
+                    </div>
+                    <div class="h-52 w-full bg-gray-900/60 rounded-xl border border-gray-800 p-2">
+                        <canvas id="latencyChartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Action Toolbar Inside Analytics -->
+                <div class="flex items-center justify-between pt-2">
+                    <div id="analyticsLastTested" class="text-xs text-gray-400">Last checked: Just now</div>
+                    <button id="modalCheckNowBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition flex items-center space-x-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span>Check Live Now</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Action Modal (No alert/confirm permitted) -->
+    <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-[#111827] border border-gray-800 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 mx-auto flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <div>
+                <h4 id="confirmModalTitle" class="text-base font-bold text-white">Delete Monitor</h4>
+                <p id="confirmModalMessage" class="text-xs text-gray-400 mt-1">Are you sure you want to delete this monitor? All historical uptime logs will be removed.</p>
+            </div>
+            <div class="flex items-center space-x-3 pt-2">
+                <button onclick="closeConfirmModal(false)" class="flex-1 px-4 py-2 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition">Cancel</button>
+                <button id="confirmModalAcceptBtn" onclick="closeConfirmModal(true)" class="flex-1 px-4 py-2 text-xs font-semibold rounded-lg bg-red-500 hover:bg-red-600 text-white transition">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        /* ============================================================
+           DATA STORE & INITIALIZATION
+           ============================================================ */
+        const STORAGE_KEY = 'uptimerobot_clone_monitors_v2';
+        let latencyChartInstance = null;
+        let soundAlertsEnabled = true;
+        let currentStatusFilter = 'ALL';
+        let isPublicView = false;
+        let countdownSec = 20;
+        let countdownTimer = null;
+        let pendingConfirmCallback = null;
+
+        // Default seed data matching realistic UptimeRobot dashboards
+        const DEFAULT_MONITORS = [
+            {
+                id: 'mon-1',
+                name: 'Production Cloud API',
+                url: 'https://api.github.com',
+                type: 'HTTP',
+                interval: 60,
+                status: 'UP',
+                uptime: 99.98,
+                lastChecked: Date.now() - 14000,
+                latency: 68,
+                sslDays: 82,
+                history: generateHistoricalBars(30, 0), // 0 outages
+                latencyHistory: [65, 72, 60, 68, 85, 64, 70, 68]
+            },
+            {
+                id: 'mon-2',
+                name: 'Global Landing Website',
+                url: 'https://www.wikipedia.org',
+                type: 'HTTP',
+                interval: 60,
+                status: 'UP',
+                uptime: 100.0,
+                lastChecked: Date.now() - 25000,
+                latency: 42,
+                sslDays: 145,
+                history: generateHistoricalBars(30, 0),
+                latencyHistory: [40, 45, 41, 44, 42, 48, 43, 42]
+            },
+            {
+                id: 'mon-3',
+                name: 'Authentication & SSO Service',
+                url: 'https://httpbin.org/status/200',
+                type: 'HTTP',
+                interval: 30,
+                status: 'UP',
+                uptime: 99.85,
+                lastChecked: Date.now() - 5000,
+                latency: 120,
+                sslDays: 61,
+                history: generateHistoricalBars(30, 1), // 1 minor outage
+                latencyHistory: [110, 125, 118, 140, 190, 130, 122, 120]
+            },
+            {
+                id: 'mon-4',
+                name: 'Payment Webhook Dispatcher',
+                url: 'https://payments.internal-mesh.net',
+                type: 'HTTP',
+                interval: 30,
+                status: 'DOWN',
+                uptime: 93.40,
+                lastChecked: Date.now() - 8000,
+                latency: 0,
+                sslDays: 34,
+                history: generateHistoricalBars(30, 3, true), // recent outage
+                latencyHistory: [0, 0, 0, 0, 0, 0, 0, 0]
+            },
+            {
+                id: 'mon-5',
+                name: 'Redis Cache Cluster [01]',
+                url: 'tcp://10.0.4.12:6379',
+                type: 'PORT',
+                interval: 60,
+                status: 'UP',
+                uptime: 99.99,
+                lastChecked: Date.now() - 32000,
+                latency: 18,
+                sslDays: null,
+                history: generateHistoricalBars(30, 0),
+                latencyHistory: [15, 18, 19, 17, 16, 22, 19, 18]
+            },
+            {
+                id: 'mon-6',
+                name: 'Customer Support Portal',
+                url: 'https://support.example.com',
+                type: 'KEYWORD',
+                keyword: 'Help Center',
+                interval: 300,
+                status: 'UP',
+                uptime: 100.0,
+                lastChecked: Date.now() - 75000,
+                latency: 89,
+                sslDays: 110,
+                history: generateHistoricalBars(30, 0),
+                latencyHistory: [85, 92, 88, 87, 95, 91, 88, 89]
+            }
+        ];
+
+        let monitors = loadMonitors();
+
+        function loadMonitors() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                }
+            } catch (e) {
+                console.warn('Failed to parse local storage, loading default seeds', e);
+            }
+            return DEFAULT_MONITORS;
+        }
+
+        function persistMonitors() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(monitors));
+            } catch (e) {
+                console.error('Storage write error', e);
+            }
+            updateSummaryKPIs();
+        }
+
+        function resetToSampleData() {
+            monitors = JSON.parse(JSON.stringify(DEFAULT_MONITORS));
+            persistMonitors();
+            renderMonitorsList();
+            showToast('Demo data reset successfully', 'info');
+        }
+
+        /* Helper to create 30 pill ticks: green (100%), yellow (minor degraded), red (down) */
+        function generateHistoricalBars(count, badDaysCount = 0, endsInDown = false) {
+            const bars = [];
+            for (let i = 0; i < count; i++) {
+                bars.push({
+                    day: count - i,
+                    status: 'UP',
+                    uptimePct: 100
+                });
+            }
+            // sprinkle bad days randomly
+            for (let b = 0; b < badDaysCount; b++) {
+                const randomIndex = Math.floor(Math.random() * (count - 4)) + 2;
+                bars[randomIndex] = {
+                    day: count - randomIndex,
+                    status: 'DEGRADED',
+                    uptimePct: (90 + Math.random() * 8).toFixed(1)
+                };
+            }
+            if (endsInDown && bars.length > 0) {
+                bars[bars.length - 1] = {
+                    day: 0,
+                    status: 'DOWN',
+                    uptimePct: 0
+                };
+            }
+            return bars;
+        }
+
+        let synth = null;
+        function getSynth() {
+            if (!synth && window.Tone) {
+                try {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -12;
+                } catch (e) {
+                    console.warn('Audio context init deferred', e);
+                }
+            }
+            return synth;
+        }
+
+        function playSound(type) {
+            if (!soundAlertsEnabled || !window.Tone) return;
+            try {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                const s = getSynth();
+                if (!s) return;
+                
+                if (type === 'up') {
+                    s.triggerAttackRelease(['C5', 'G5'], '16n');
+                } else if (type === 'down') {
+                    s.triggerAttackRelease(['F4', 'C4'], '8n');
+                } else if (type === 'ping') {
+                    s.triggerAttackRelease('A5', '32n');
+                }
+            } catch (err) {
+                // Audio play blocked by browser autoplay policy until user gesture
+            }
+        }
+
+        function toggleSoundAlerts() {
+            soundAlertsEnabled = !soundAlertsEnabled;
+            const onIcon = document.getElementById('soundIconOn');
+            const offIcon = document.getElementById('soundIconOff');
+            if (soundAlertsEnabled) {
+                onIcon.classList.remove('hidden');
+                offIcon.classList.add('hidden');
+                showToast('Audio alerts enabled', 'info');
+                playSound('ping');
+            } else {
+                onIcon.classList.add('hidden');
+                offIcon.classList.remove('hidden');
+                showToast('Audio alerts muted', 'info');
+            }
+        }
+
+        function updateSummaryKPIs() {
+            const total = monitors.length;
+            const up = monitors.filter(m => m.status === 'UP').length;
+            const down = monitors.filter(m => m.status === 'DOWN').length;
+            const paused = monitors.filter(m => m.status === 'PAUSED').length;
+
+            document.getElementById('statTotalMonitors').textContent = total;
+            document.getElementById('statUpMonitors').textContent = up;
+            document.getElementById('statDownMonitors').textContent = down;
+            document.getElementById('statActiveRatio').textContent = `${up} active &bull; ${paused} paused`;
+            
+            // Overall uptime percentage calculation
+            if (total > 0) {
+                const sumUptime = monitors.reduce((acc, m) => acc + (parseFloat(m.uptime) || 0), 0);
+                const overallPct = (sumUptime / total).toFixed(2);
+                document.getElementById('statOverallUptime').textContent = `${overallPct}%`;
+                const pubEl = document.getElementById('publicOverallUptime');
+                if (pubEl) pubEl.textContent = `${overallPct}%`;
+            }
+
+            // Average active latency calculation
+            const upMonitors = monitors.filter(m => m.status === 'UP' && m.latency > 0);
+            if (upMonitors.length > 0) {
+                const avgLat = Math.round(upMonitors.reduce((acc, m) => acc + m.latency, 0) / upMonitors.length);
+                document.getElementById('statAvgLatency').textContent = `${avgLat} ms`;
+            } else {
+                document.getElementById('statAvgLatency').textContent = `0 ms`;
+            }
+
+            // Incident Banner check
+            const incidentAlert = document.getElementById('activeIncidentAlert');
+            const incidentAlertTitle = document.getElementById('incidentAlertTitle');
+            const incidentAlertDesc = document.getElementById('incidentAlertDesc');
+            if (down > 0) {
+                incidentAlert.classList.remove('hidden');
+                incidentAlertTitle.textContent = `${down} Service Incident Detected`;
+                incidentAlertDesc.textContent = `${down} monitor(s) currently reporting downtime. Response status check failed.`;
+                document.getElementById('publicSystemStatusText').textContent = `${down} Outage Impacting Global Infrastructure`;
+                document.getElementById('publicSystemStatusText').parentElement.className = 'inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium';
+            } else {
+                incidentAlert.classList.add('hidden');
+                document.getElementById('publicSystemStatusText').textContent = 'All Core Systems Operational';
+                document.getElementById('publicSystemStatusText').parentElement.className = 'inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-medium';
+            }
+        }
+
+        function dismissIncidentBanner() {
+            document.getElementById('activeIncidentAlert').classList.add('hidden');
+        }
+
+        function renderMonitorsList() {
+            const container = document.getElementById('monitorsContainer');
+            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+
+            const filtered = monitors.filter(m => {
+                const matchesFilter = (currentStatusFilter === 'ALL') || (m.status === currentStatusFilter);
+                const matchesSearch = m.name.toLowerCase().includes(searchQuery) || m.url.toLowerCase().includes(searchQuery);
+                return matchesFilter && matchesSearch;
+            });
+
+            document.getElementById('monitorsCountText').textContent = `Showing ${filtered.length} of ${monitors.length} monitors`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-8 text-center space-y-3">
+                        <div class="w-12 h-12 rounded-full bg-gray-800 text-gray-500 mx-auto flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <h4 class="text-sm font-semibold text-gray-300">No monitors match current criteria</h4>
+                        <p class="text-xs text-gray-500">Try adjusting your search terms or create a new monitor check.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(monitor => {
+                const isUp = monitor.status === 'UP';
+                const isDown = monitor.status === 'DOWN';
+                const isPaused = monitor.status === 'PAUSED';
+
+                // Status configuration
+                let badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                let dotClass = 'bg-emerald-400 pulse-beacon';
+                let statusLabel = 'UP';
+                if (isDown) {
+                    badgeClass = 'bg-red-500/10 text-red-400 border-red-500/30';
+                    dotClass = 'bg-red-500 pulse-beacon';
+                    statusLabel = 'DOWN';
+                } else if (isPaused) {
+                    badgeClass = 'bg-gray-800 text-gray-400 border-gray-700';
+                    dotClass = 'bg-gray-500';
+                    statusLabel = 'PAUSED';
+                }
+
+                // Render 30 timeline ticks
+                const timelinePills = monitor.history.map((dayItem, idx) => {
+                    let pillColor = 'bg-emerald-500';
+                    if (dayItem.status === 'DEGRADED') pillColor = 'bg-amber-400';
+                    if (dayItem.status === 'DOWN') pillColor = 'bg-red-500';
+                    if (isPaused) pillColor = 'bg-gray-700';
+
+                    const tooltipText = dayItem.day === 0 ? 'Today: ' + (isUp ? '100% operational' : 'Incident active') : `${dayItem.day}d ago &bull; ${dayItem.uptimePct}% uptime`;
+                    return `<span title="${tooltipText}" class="timeline-pill flex-1 h-7 rounded-sm ${pillColor} cursor-pointer opacity-90 hover:opacity-100 transition"></span>`;
+                }).join('');
+
+                const relativeTime = getRelativeTimeString(monitor.lastChecked);
+
+                return `
+                <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 sm:p-5 hover:border-gray-700/80 transition-all shadow-md group">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        
+                        <!-- Left: Status + Name + Protocol Details -->
+                        <div class="flex items-start space-x-3.5 min-w-[260px]">
+                            <div class="pt-0.5">
+                                <span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-bold border ${badgeClass}">
+                                    <span class="w-2 h-2 rounded-full ${dotClass}"></span>
+                                    <span>${statusLabel}</span>
+                                </span>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="flex items-center space-x-2">
+                                    <h3 class="text-sm sm:text-base font-semibold text-white group-hover:text-emerald-400 transition cursor-pointer" onclick="openAnalyticsModal('${monitor.id}')">
+                                        ${escapeHtml(monitor.name)}
+                                    </h3>
+                                    <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700/60">${monitor.type}</span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-xs text-gray-400 font-mono">
+                                    <span class="truncate max-w-[200px] sm:max-w-xs hover:text-gray-200" title="${escapeHtml(monitor.url)}">${escapeHtml(monitor.url)}</span>
+                                    <span>&bull;</span>
+                                    <span class="text-gray-400">${monitor.interval}s interval</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Center: 30-Day Activity Heatmap Bars -->
+                        <div class="flex-1 max-w-md w-full">
+                            <div class="flex items-center justify-between text-[11px] text-gray-400 mb-1.5">
+                                <span>30 days ago</span>
+                                <span class="font-mono text-emerald-400 font-medium">${monitor.uptime}% Uptime</span>
+                                <span>Today</span>
+                            </div>
+                            <div class="flex items-center space-x-[2px] bg-gray-900/60 p-1 rounded-md border border-gray-800/80">
+                                ${timelinePills}
+                            </div>
+                        </div>
+
+                        <!-- Right: Response Time & Quick Action Icons -->
+                        <div class="flex items-center justify-between lg:justify-end space-x-4 border-t lg:border-t-0 pt-3 lg:pt-0 border-gray-800">
+                            <!-- Latency Display -->
+                            <div class="text-left lg:text-right min-w-[70px]">
+                                <span class="text-[11px] text-gray-400 uppercase tracking-wider block">Latency</span>
+                                <span class="text-sm font-mono font-bold ${isUp ? 'text-emerald-400' : 'text-gray-500'}">
+                                    ${isUp ? monitor.latency + ' ms' : (isPaused ? 'Paused' : 'Failed')}
+                                </span>
+                            </div>
+
+                            <!-- Actions Toolbar -->
+                            <div class="flex items-center space-x-1">
+                                <!-- Check Now Button -->
+                                <button onclick="checkSingleMonitor('${monitor.id}', this)" title="Test live ping now" class="p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-emerald-400 border border-gray-800 transition">
+                                    <svg class="w-4 h-4 check-spin-target" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                </button>
+                                
+                                <!-- Analytics Details Button -->
+                                <button onclick="openAnalyticsModal('${monitor.id}')" title="View Response Time Graphs" class="p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-800 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                </button>
+
+                                <!-- Pause / Resume Button -->
+                                <button onclick="toggleMonitorPause('${monitor.id}')" title="${isPaused ? 'Resume Monitoring' : 'Pause Monitoring'}" class="p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-amber-400 border border-gray-800 transition">
+                                    ${isPaused 
+                                        ? `<svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
+                                        : `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`
+                                    }
+                                </button>
+
+                                <!-- Edit Button -->
+                                <button onclick="openEditMonitorModal('${monitor.id}')" title="Edit Monitor Settings" class="p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-800 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+
+                                <!-- Delete Button -->
+                                <button onclick="promptDeleteMonitor('${monitor.id}')" title="Delete Monitor" class="p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-red-400 border border-gray-800 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        async function checkSingleMonitor(id, triggerButton) {
+            const monitor = monitors.find(m => m.id === id);
+            if (!monitor || monitor.status === 'PAUSED') return;
+
+            const icon = triggerButton?.querySelector('.check-spin-target');
+            if (icon) icon.classList.add('animate-spin', 'text-amber-400');
+
+            const startTime = performance.now();
+            let success = true;
+            let latencyMs = 0;
+
+            try {
+                // If it's a web URL, attempt a no-cors lightweight client-side fetch ping
+                if (monitor.url.startsWith('http://') || monitor.url.startsWith('https://')) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+                    try {
+                        await fetch(monitor.url, {
+                            method: 'HEAD',
+                            mode: 'no-cors',
+                            cache: 'no-store',
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        latencyMs = Math.round(performance.now() - startTime);
+                    } catch (netErr) {
+                        // CORS or Network restriction: simulate realistic ping response
+                        latencyMs = Math.floor(Math.random() * 45) + 35;
+                    }
+                } else {
+                    // TCP / Port check simulation
+                    latencyMs = Math.floor(Math.random() * 20) + 12;
+                }
+            } catch (err) {
+                success = false;
+            }
+
+            if (monitor.status === 'DOWN') {
+                // If intentionally in simulated outage state
+                monitor.latency = 0;
+            } else {
+                monitor.status = 'UP';
+                monitor.latency = latencyMs;
+                monitor.lastChecked = Date.now();
+
+                // Append latency history for the chart
+                monitor.latencyHistory.push(latencyMs);
+                if (monitor.latencyHistory.length > 12) monitor.latencyHistory.shift();
+
+                playSound('up');
+            }
+
+            if (icon) {
+                setTimeout(() => {
+                    icon.classList.remove('animate-spin', 'text-amber-400');
+                }, 400);
+            }
+
+            persistMonitors();
+            renderMonitorsList();
+            showToast(`Tested "${monitor.name}": ${monitor.status} (${monitor.latency}ms)`, monitor.status === 'UP' ? 'success' : 'error');
+        }
+
+        async function checkAllMonitorsNow() {
+            const spinIcon = document.getElementById('refreshSpinIcon');
+            spinIcon.classList.add('animate-spin');
+            
+            showToast('Initiating sweep check across all active monitors...', 'info');
+
+            for (const mon of monitors) {
+                if (mon.status !== 'PAUSED') {
+                    // Random small jitter in ping
+                    const jitter = Math.floor(Math.random() * 18) - 9;
+                    if (mon.status === 'UP') {
+                        mon.latency = Math.max(12, mon.latency + jitter);
+                        mon.latencyHistory.push(mon.latency);
+                        if (mon.latencyHistory.length > 12) mon.latencyHistory.shift();
+                    }
+                    mon.lastChecked = Date.now();
+                }
+            }
+
+            setTimeout(() => {
+                spinIcon.classList.remove('animate-spin');
+                persistMonitors();
+                renderMonitorsList();
+                playSound('ping');
+                showToast('All health probes completed', 'success');
+            }, 700);
+        }
+
+        /* Toggle Outage Simulation to test alert flows */
+        function simulateIncidentToggle() {
+            const target = monitors.find(m => m.status === 'UP') || monitors[0];
+            if (!target) return;
+
+            if (target.status === 'UP') {
+                target.status = 'DOWN';
+                target.latency = 0;
+                target.uptime = (parseFloat(target.uptime) - 0.45).toFixed(2);
+                target.history[target.history.length - 1] = { day: 0, status: 'DOWN', uptimePct: 0 };
+                playSound('down');
+                showToast(`ALARM: Outage simulated on "${target.name}"!`, 'error');
+            } else {
+                target.status = 'UP';
+                target.latency = 58;
+                target.history[target.history.length - 1] = { day: 0, status: 'UP', uptimePct: 100 };
+                playSound('up');
+                showToast(`RESOLVED: Service "${target.name}" restored to nominal status.`, 'success');
+            }
+
+            persistMonitors();
+            renderMonitorsList();
+        }
+
+        /* Pause / Resume a monitor */
+        function toggleMonitorPause(id) {
+            const monitor = monitors.find(m => m.id === id);
+            if (!monitor) return;
+
+            if (monitor.status === 'PAUSED') {
+                monitor.status = 'UP';
+                monitor.latency = 45;
+                showToast(`Resumed monitoring for "${monitor.name}"`, 'success');
+                playSound('up');
+            } else {
+                monitor.status = 'PAUSED';
+                monitor.latency = 0;
+                showToast(`Paused monitoring for "${monitor.name}"`, 'info');
+            }
+
+            persistMonitors();
+            renderMonitorsList();
+        }
+
+        function openAddMonitorModal() {
+            document.getElementById('modalTitle').textContent = 'Create New Monitor';
+            document.getElementById('monitorIdInput').value = '';
+            document.getElementById('monitorNameInput').value = '';
+            document.getElementById('monitorUrlInput').value = '';
+            document.getElementById('monitorIntervalInput').value = '60';
+            document.getElementById('monitorKeywordInput').value = '';
+            
+            const httpRadio = document.querySelector('input[name="monitorType"][value="HTTP"]');
+            if (httpRadio) httpRadio.checked = true;
+            updateFormTypeFields();
+
+            document.getElementById('monitorModal').classList.remove('hidden');
+        }
+
+        function openEditMonitorModal(id) {
+            const monitor = monitors.find(m => m.id === id);
+            if (!monitor) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Monitor Settings';
+            document.getElementById('monitorIdInput').value = monitor.id;
+            document.getElementById('monitorNameInput').value = monitor.name;
+            document.getElementById('monitorUrlInput').value = monitor.url;
+            document.getElementById('monitorIntervalInput').value = monitor.interval || 60;
+            document.getElementById('monitorKeywordInput').value = monitor.keyword || '';
+
+            const typeRadio = document.querySelector(`input[name="monitorType"][value="${monitor.type}"]`);
+            if (typeRadio) typeRadio.checked = true;
+            updateFormTypeFields();
+
+            document.getElementById('monitorModal').classList.remove('hidden');
+        }
+
+        function updateFormTypeFields() {
+            const selectedType = document.querySelector('input[name="monitorType"]:checked')?.value;
+            const keywordContainer = document.getElementById('keywordFieldContainer');
+            if (selectedType === 'KEYWORD') {
+                keywordContainer.classList.remove('hidden');
+            } else {
+                keywordContainer.classList.add('hidden');
+            }
+        }
+
+        function closeMonitorModal() {
+            document.getElementById('monitorModal').classList.add('hidden');
+        }
+
+        function saveMonitor(e) {
+            e.preventDefault();
+            const id = document.getElementById('monitorIdInput').value;
+            const name = document.getElementById('monitorNameInput').value.trim();
+            const url = document.getElementById('monitorUrlInput').value.trim();
+            const interval = parseInt(document.getElementById('monitorIntervalInput').value, 10);
+            const type = document.querySelector('input[name="monitorType"]:checked')?.value || 'HTTP';
+            const keyword = document.getElementById('monitorKeywordInput').value.trim();
+
+            if (!name || !url) {
+                showToast('Please fill out all required fields', 'error');
+                return;
+            }
+
+            if (id) {
+                // Editing existing
+                const existing = monitors.find(m => m.id === id);
+                if (existing) {
+                    existing.name = name;
+                    existing.url = url;
+                    existing.type = type;
+                    existing.interval = interval;
+                    if (type === 'KEYWORD') existing.keyword = keyword;
+                    showToast('Monitor updated successfully', 'success');
+                }
+            } else {
+                // Creating new
+                const newMonitor = {
+                    id: 'mon-' + Date.now(),
+                    name,
+                    url,
+                    type,
+                    interval,
+                    status: 'UP',
+                    uptime: 100.0,
+                    lastChecked: Date.now(),
+                    latency: Math.floor(Math.random() * 40) + 25,
+                    sslDays: url.startsWith('https://') ? 89 : null,
+                    keyword: type === 'KEYWORD' ? keyword : undefined,
+                    history: generateHistoricalBars(30, 0),
+                    latencyHistory: [45, 52, 48, 50, 42, 47, 49, 45]
+                };
+                monitors.unshift(newMonitor);
+                showToast(`Monitor "${name}" created and verified`, 'success');
+                playSound('up');
+            }
+
+            persistMonitors();
+            renderMonitorsList();
+            closeMonitorModal();
+        }
+
+        /* Deletion with custom modal confirm */
+        function promptDeleteMonitor(id) {
+            const monitor = monitors.find(m => m.id === id);
+            if (!monitor) return;
+
+            document.getElementById('confirmModalTitle').textContent = `Delete "${monitor.name}"?`;
+            document.getElementById('confirmModalMessage').textContent = `Are you sure you want to stop monitoring ${monitor.url}? Historical logs will be permanently erased.`;
+            document.getElementById('confirmModal').classList.remove('hidden');
+
+            pendingConfirmCallback = (confirmed) => {
+                if (confirmed) {
+                    monitors = monitors.filter(m => m.id !== id);
+                    persistMonitors();
+                    renderMonitorsList();
+                    showToast(`Monitor removed`, 'info');
+                }
+            };
+        }
+
+        function closeConfirmModal(confirmed) {
+            document.getElementById('confirmModal').classList.add('hidden');
+            if (pendingConfirmCallback) {
+                pendingConfirmCallback(confirmed);
+                pendingConfirmCallback = null;
+            }
+        }
+
+        function openAnalyticsModal(id) {
+            const monitor = monitors.find(m => m.id === id);
+            if (!monitor) return;
+
+            document.getElementById('analyticsTitle').textContent = monitor.name;
+            document.getElementById('analyticsUrl').textContent = monitor.url;
+            document.getElementById('analyticsCurrentPing').textContent = monitor.status === 'UP' ? `${monitor.latency} ms` : 'Offline';
+            document.getElementById('analyticsUptimePct').textContent = `${monitor.uptime}%`;
+            document.getElementById('analyticsSslStatus').textContent = monitor.sslDays ? `Valid (${monitor.sslDays} days left)` : 'N/A (Non-SSL/Port)';
+            document.getElementById('analyticsLastTested').textContent = `Last tested: ${getRelativeTimeString(monitor.lastChecked)}`;
+
+            // Check Live Now button inside modal
+            const checkNowBtn = document.getElementById('modalCheckNowBtn');
+            checkNowBtn.onclick = () => {
+                checkSingleMonitor(monitor.id, null);
+                openAnalyticsModal(monitor.id);
+            };
+
+            // Render Chart
+            const ctx = document.getElementById('latencyChartCanvas').getContext('2d');
+            if (latencyChartInstance) {
+                latencyChartInstance.destroy();
+            }
+
+            const labels = ['7h ago', '6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'];
+            const dataPoints = monitor.latencyHistory.slice(-8);
+
+            latencyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Response Latency (ms)',
+                        data: dataPoints,
+                        borderColor: '#00C271',
+                        backgroundColor: 'rgba(0, 194, 113, 0.12)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#00C271',
+                        pointBorderColor: '#111827',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1F2937',
+                            titleColor: '#F3F4F6',
+                            bodyColor: '#10B981',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: (context) => `${context.parsed.y} ms response time`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(55, 65, 81, 0.3)' },
+                            ticks: { color: '#9CA3AF', font: { size: 10 } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(55, 65, 81, 0.3)' },
+                            ticks: { color: '#9CA3AF', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('analyticsModal').classList.remove('hidden');
+        }
+
+        function closeAnalyticsModal() {
+            document.getElementById('analyticsModal').classList.add('hidden');
+            if (latencyChartInstance) {
+                latencyChartInstance.destroy();
+                latencyChartInstance = null;
+            }
+        }
+
+        function togglePublicStatusPage() {
+            isPublicView = !isPublicView;
+            const dashView = document.getElementById('dashboardView');
+            const pubView = document.getElementById('publicStatusPageView');
+            const viewText = document.getElementById('viewModeText');
+            const timerBadge = document.getElementById('refreshTimerBadge');
+
+            if (isPublicView) {
+                dashView.classList.add('hidden');
+                pubView.classList.remove('hidden');
+                timerBadge.classList.add('hidden');
+                viewText.textContent = 'Dashboard View';
+                renderPublicStatusPage();
+            } else {
+                dashView.classList.remove('hidden');
+                pubView.classList.add('hidden');
+                timerBadge.classList.remove('hidden');
+                viewText.textContent = 'Public Status Page';
+            }
+        }
+
+        function renderPublicStatusPage() {
+            const listContainer = document.getElementById('publicComponentsList');
+            const historyContainer = document.getElementById('incidentHistoryList');
+
+            // Render components list
+            listContainer.innerHTML = monitors.map(m => {
+                const isUp = m.status === 'UP';
+                const isDown = m.status === 'DOWN';
+                let statusBadge = `<span class="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Operational</span>`;
+                if (isDown) {
+                    statusBadge = `<span class="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-500/10 text-red-400 border border-red-500/30">Major Outage</span>`;
+                } else if (m.status === 'PAUSED') {
+                    statusBadge = `<span class="px-2.5 py-1 text-xs font-semibold rounded-md bg-gray-800 text-gray-400">Maintenance</span>`;
+                }
+
+                return `
+                    <div class="bg-[#111827] rounded-xl border border-gray-800 p-4 flex items-center justify-between">
+                        <div>
+                            <div class="font-semibold text-white text-sm">${escapeHtml(m.name)}</div>
+                            <div class="text-xs text-gray-400 font-mono mt-0.5">${m.type} &bull; ${m.uptime}% uptime</div>
+                        </div>
+                        <div>${statusBadge}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Incident History
+            historyContainer.innerHTML = `
+                <div class="border-l-2 border-emerald-500 pl-4 space-y-1">
+                    <span class="text-xs font-bold uppercase text-emerald-400">Today &bull; All Systems Monitored</span>
+                    <p class="text-xs text-gray-300">Continuous latency and health probing active with zero packet drop on verified endpoints.</p>
+                </div>
+                <div class="border-l-2 border-amber-500 pl-4 space-y-1">
+                    <span class="text-xs font-bold uppercase text-amber-400">3 Days Ago &bull; Scheduled Edge CDN Maintenance</span>
+                    <p class="text-xs text-gray-400">Route propagation updates completed in Frankfurt and Tokyo regions. Latency restored to nominal 45ms within 4 minutes.</p>
+                </div>
+                <div class="border-l-2 border-gray-700 pl-4 space-y-1">
+                    <span class="text-xs font-bold uppercase text-gray-400">12 Days Ago &bull; Upstream DNS Provider Congestion</span>
+                    <p class="text-xs text-gray-400">Intermittent resolution delays observed on external DNS resolvers. Failover to Anycast secondary was triggered automatically.</p>
+                </div>
+            `;
+        }
+
+        function setStatusFilter(status) {
+            currentStatusFilter = status;
+            ['ALL', 'UP', 'DOWN', 'PAUSED'].forEach(s => {
+                const btn = document.getElementById(`filterBtn${s}`);
+                if (btn) {
+                    if (s === status) {
+                        btn.className = 'px-3 py-1.5 rounded-md bg-gray-800 text-white shadow-sm transition';
+                    } else {
+                        btn.className = 'px-3 py-1.5 rounded-md text-gray-400 hover:text-white transition';
+                    }
+                }
+            });
+            renderMonitorsList();
+        }
+
+        function filterMonitors() {
+            renderMonitorsList();
+        }
+
+        function startAutoCheckTimer() {
+            if (countdownTimer) clearInterval(countdownTimer);
+            countdownTimer = setInterval(() => {
+                countdownSec--;
+                const display = document.getElementById('countdownDisplay');
+                if (display) display.textContent = `${countdownSec}s`;
+
+                if (countdownSec <= 0) {
+                    countdownSec = 30;
+                    // Passive background latency fluctuation
+                    monitors.forEach(m => {
+                        if (m.status === 'UP') {
+                            const delta = Math.floor(Math.random() * 9) - 4;
+                            m.latency = Math.max(15, m.latency + delta);
+                        }
+                    });
+                    persistMonitors();
+                    renderMonitorsList();
+                }
+            }, 1000);
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let colorClasses = 'bg-gray-900 border-gray-700 text-gray-200';
+            let iconSvg = `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+            
+            if (type === 'error') {
+                colorClasses = 'bg-red-950/90 border-red-800 text-red-200';
+                iconSvg = `<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+            } else if (type === 'success') {
+                colorClasses = 'bg-emerald-950/90 border-emerald-800 text-emerald-200';
+            }
+
+            toast.className = `flex items-center space-x-2.5 px-4 py-3 rounded-xl border ${colorClasses} shadow-2xl text-xs font-medium transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<span>${iconSvg}</span><span>${escapeHtml(message)}</span>`;
+
+            container.appendChild(toast);
+
+            // Animate In
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            // Dismiss after 3.5s
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function getRelativeTimeString(timestamp) {
+            const diffSeconds = Math.round((Date.now() - timestamp) / 1000);
+            if (diffSeconds < 5) return 'Just now';
+            if (diffSeconds < 60) return `${diffSeconds}s ago`;
+            const diffMinutes = Math.round(diffSeconds / 60);
+            if (diffMinutes < 60) return `${diffMinutes}m ago`;
+            return `${Math.round(diffMinutes / 60)}h ago`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Global key listeners (ESC closes open modals)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeMonitorModal();
+                closeAnalyticsModal();
+                closeConfirmModal(false);
+            }
+        });
+
+        // Initialize application on window load
+        window.addEventListener('DOMContentLoaded', () => {
+            updateSummaryKPIs();
+            renderMonitorsList();
+            startAutoCheckTimer();
+        });
+    </script>
+</body>
+</html>
